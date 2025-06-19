@@ -1,0 +1,75 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.interpolate import interp1d
+import os
+folder = r"C:\Users\ravim\Desktop\RSI\MiniPaper\Intermediates"
+pink_file = os.path.join(folder, "spectrumpinknoise.txt")
+output_img = os.path.join(folder, "combined_spectrum_match_ratings.png")
+
+
+location_labels = [
+    "Biological Sciences Building",                      # 0.61
+    "Guest House",                 # 0.37
+    "Forest",# 0.55
+    "Main Building",               # 0.55 (second one)
+    "State Bank, IISc"             # 0.54
+]
+
+pink = pd.read_csv(pink_file, sep="\t", encoding='utf-8-sig')
+pink.columns = ["Frequency", "Amplitude"]
+pink = pink.sort_values("Frequency")
+
+def normalize(arr):
+    rng = np.max(arr) - np.min(arr)
+    return (arr - np.min(arr)) / (rng if rng != 0 else 1)
+
+common_freq = np.linspace(pink["Frequency"].min(), pink["Frequency"].max(), 1000)
+interp_pink = interp1d(pink["Frequency"], pink["Amplitude"], kind='linear', fill_value="extrapolate")
+amp_pink = interp_pink(common_freq)
+amp_pink_norm = normalize(amp_pink)
+
+plt.figure(figsize=(14, 7))
+plt.plot(common_freq, amp_pink_norm, label="Pink Noise", color='magenta', linewidth=2, linestyle='--')
+
+# === PROCESS AND PLOT EACH SPECTRUM ===
+colors = ['navy', 'teal', 'orange', 'darkred', 'green']
+for i in range(1, 6):
+    name = f"spectrum{i if i > 1 else ''}.txt"
+    path = os.path.join(folder, name)
+    
+    if not os.path.exists(path):
+        print(f" Missing file: {name}")
+        continue
+
+    df = pd.read_csv(path, sep="\t", encoding='utf-8-sig')
+    df.columns = ["Frequency", "Amplitude"]
+    df = df.sort_values("Frequency")
+
+    freq_min = max(df["Frequency"].min(), pink["Frequency"].min())
+    freq_max = min(df["Frequency"].max(), pink["Frequency"].max())
+    common_freq = np.linspace(freq_min, freq_max, 1000)
+
+    interp_night = interp1d(df["Frequency"], df["Amplitude"], kind='linear', fill_value="extrapolate")
+    amp_night = interp_night(common_freq)
+    amp_night_norm = normalize(amp_night)
+
+    rmse = np.sqrt(np.mean((amp_night_norm - amp_pink_norm) ** 2))
+    match_rating = 1 - rmse
+    label = f"{location_labels[i - 1]} (Match: {match_rating:.2f})"
+    plt.plot(common_freq, amp_night_norm, label=label, color=colors[i - 1], alpha=0.9)
+
+plt.title("Match Ratings of Nighttime Recordings vs Pink Noise")
+plt.xlabel("Frequency (Hz)")
+plt.ylabel("Normalized Amplitude")
+plt.xscale('log')
+plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+plt.legend()
+plt.tight_layout()
+plt.savefig(output_img, dpi=300)
+
+try:
+    os.startfile(output_img)
+except:
+    print(f" Saved to: {output_img}")
+plt.show()
