@@ -1,0 +1,41 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.signal import find_peaks
+
+# === 1. Load HI Data ===
+file_path = r"D:\03_Research_Papers\00_RSI_N.Roy\210.txt
+with open(file_path, 'r') as f:
+    lines = f.readlines()
+
+start_index = next(i for i, line in enumerate(lines) if line.strip().startswith('-') or line.strip()[0].isdigit())
+data = np.loadtxt(lines[start_index:], usecols=(0, 1))
+velocity = data[:, 0]
+intensity = data[:, 1]
+
+# === 2. Optional: crop region ===
+v_min, v_max = 40, 80
+mask = (velocity >= v_min) & (velocity <= v_max)
+velocity = velocity[mask]
+intensity = intensity[mask]
+
+# === 3. Find peaks for hinting initial guesses ===
+peaks, props = find_peaks(intensity, height=0.2, distance=5)
+
+# === 4. Plot ===
+plt.figure(figsize=(12, 6))
+plt.plot(velocity, intensity, label='HI Spectrum', lw=1.5)
+plt.plot(velocity[peaks], intensity[peaks], 'rx', label='Detected Peaks')
+
+# Annotate peaks with v and T_B
+for i in range(len(peaks)):
+    v = velocity[peaks[i]]
+    T = intensity[peaks[i]]
+    plt.text(v, T + 0.5, f"{v:.1f}\n{T:.1f}", ha='center', fontsize=8)
+
+plt.xlabel("Velocity (km/s)")
+plt.ylabel("T_B (K)")
+plt.title("HI Spectrum — l=50°, b=0°")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
